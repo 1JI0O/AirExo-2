@@ -54,7 +54,7 @@ def get_wrench_by_timestamp(file_path, target_ts):
         
         return pose
 
-file_path = '/data/haoxiang/data/airexo2/task_0013/train/scene_0001/lowdim/robot_left.h5' 
+file_path = '/data/haoxiang/data/airexo2/task_0013/train/scene_0001/lowdim/gripper_left.h5' 
 # 换成你想看的文件名
 
 # 读取h5结构
