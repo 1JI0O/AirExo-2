@@ -153,3 +153,52 @@ PY
 - 不返回 `outputs` 或 base64 大字段。
 - 不跳过截断，或私自提高截断上限。
 - 不在一次请求中批量返回多个长 cell 正文。
+
+## Notebook 安全审查/读取规范
+
+### 为什么不能直接粗暴读取 `.ipynb`
+- `.ipynb` 是 JSON 容器，`outputs` 中常见 `image/png` 等 base64 大字段，单个 cell 输出就可能非常大。
+- 全量读取会把图像、日志、富文本等执行噪声一并带入审查上下文，稀释真实代码逻辑。
+- 上下文被大输出挤占后，容易出现关键信息截断、定位不准与结论误判。
+
+### 标准做法
+- 代码逻辑审查统一限定为：仅提取 `cells[*].source`。
+- 默认不读取、不展开 `outputs`；除专项排障外，不以输出内容作为主证据。
+
+### 推荐流程
+1. 定位目标 notebook 与候选 cell（按 index、关键词或符号名）。
+2. 仅读取目标 cell 的 `source`，必要时再读取相邻少量 cell 的 `source`。
+3. 记录可定位证据：文件路径、cell index、关键代码片段。
+4. 基于 `source` 做逻辑核对，并在必要时补充符号/代数一致性验证。
+5. 全程避免加载 `outputs`；证据不足时继续按 cell 扩展，而不是整本展开。
+
+### Do / Don’t 清单
+
+**Do**
+- 只审查 code cell 的 `source`，并保留 cell index 作为定位锚点。
+- 结论必须附可回溯证据（路径 + cell index + 关键片段）。
+- 先静态逻辑审查，再做最小必要的数学/符号验证。
+
+**Don’t**
+- 不整本展开 `.ipynb` 原文或一次性打印完整 JSON。
+- 不读取或反序列化 `outputs`（尤其 base64 图像/富媒体）。
+- 不把渲染结果截图、富文本显示当作代码正确性的直接证据。
+
+### 最小可复制示例（仅提取 code cell 的 source）
+```python
+import json
+from pathlib import Path
+
+nb_path = Path("robot_reconstruction_Version4_compare_transforms3d.ipynb")
+
+with nb_path.open("r", encoding="utf-8") as f:
+    nb = json.load(f)
+
+for idx, cell in enumerate(nb.get("cells", [])):
+    if cell.get("cell_type") != "code":
+        continue
+
+    source = "".join(cell.get("source", []))
+    print(f"\n# [code-cell:{idx}]")
+    print(source)
+```
